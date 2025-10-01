@@ -100,9 +100,10 @@
         const settings = {
           gravity: 0.5,
           lift: -10,
-          pipeWidth: 60,
-          pipeGap: 200,
-          pipeInterval: 90, // frames
+          pipeWidth: 70, // Pipa sedikit lebih lebar
+          pipeGap: 220, // Celah lebih besar
+          pipeInterval: 90,
+          minPipeHeight: 60, // Tinggi minimum untuk pipa atas/bawah
         };
 
         class Bird {
@@ -144,10 +145,14 @@
             this.x = canvas.width;
             this.width = settings.pipeWidth;
             this.gap = settings.pipeGap;
-            this.topHeight =
-              Math.random() * (canvas.height - this.gap - 100) + 50;
-            this.bottomY = this.topHeight + this.gap;
             this.passed = false;
+
+            // --- INI PERBAIKAN UTAMANYA ---
+            const minHeight = settings.minPipeHeight;
+            const availableSpace = canvas.height - this.gap - minHeight * 2;
+            this.topHeight =
+              Math.floor(Math.random() * availableSpace) + minHeight;
+            this.bottomY = this.topHeight + this.gap;
           }
           draw() {
             ctx.fillStyle = "#22c55e"; // green-500
@@ -276,7 +281,12 @@
         window.addEventListener("keydown", (e) => {
           if (e.code === "Space") {
             e.preventDefault();
-            handleInput();
+            // Jika game belum aktif dan modal terlihat, mulai game
+            if (!gameActive && modal.style.display !== "none") {
+              startGame();
+            } else {
+              handleInput();
+            }
           }
         });
 
