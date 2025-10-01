@@ -23,6 +23,7 @@
       #game-canvas {
         background-color: #000;
         border: 2px solid #374151;
+        display: block; /* Important for sizing */
       }
       #side-panel {
         background-color: #000;
@@ -61,7 +62,8 @@
 
       <!-- Papan Permainan Utama -->
       <div
-        class="relative w-full max-w-sm aspect-[10/20] order-1 md:order-2 rounded-lg shadow-2xl"
+        id="game-container"
+        class="relative order-1 md:order-2 rounded-lg shadow-2xl"
       >
         <canvas id="game-canvas"></canvas>
         <div
@@ -166,13 +168,21 @@
         ];
 
         function resizeCanvas() {
-          const container = canvas.parentElement;
-          const size = Math.min(
-            container.clientWidth,
-            container.clientHeight * 0.5
-          );
-          canvas.width = size;
-          canvas.height = size * 2;
+          const gameContainer = document.getElementById("game-container");
+          const sidePanel = document.getElementById("side-panel");
+
+          // Batasi tinggi game sebesar 85% dari tinggi layar
+          const availableHeight = window.innerHeight * 0.85;
+
+          canvas.height = availableHeight;
+          canvas.width = availableHeight / 2; // Pertahankan rasio 1:2
+
+          // Atur ukuran container div agar sesuai dengan canvas
+          gameContainer.style.height = `${canvas.height}px`;
+          gameContainer.style.width = `${canvas.width}px`;
+          // Pastikan panel samping tidak lebih tinggi dari game
+          sidePanel.style.maxHeight = `${canvas.height}px`;
+
           blockSize = canvas.width / COLS;
 
           nextCanvas.width = blockSize * 4;
@@ -309,7 +319,7 @@
             p.x += offset;
             offset = -(offset + (offset > 0 ? 1 : -1));
             if (offset > rotated[0].length) {
-              return; // Can't rotate
+              return;
             }
           }
           piece.matrix = rotated;
