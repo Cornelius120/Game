@@ -47,7 +47,7 @@
         <canvas id="game-canvas"></canvas>
         <div
           id="score-display"
-          class="absolute top-4 left-1/2 -translate-x-1/2 text-5xl font-bold text-white"
+          class="absolute top-4 left-1/2 -translate-x-1.2 text-5xl font-bold text-white"
           style="text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5)"
         >
           0
@@ -103,7 +103,6 @@
           pipeWidth: 70,
           pipeGap: 220,
           pipeInterval: 90,
-          minPipeHeight: 60,
         };
 
         class Bird {
@@ -126,13 +125,6 @@
           update() {
             this.velocity += settings.gravity;
             this.y += this.velocity;
-
-            if (
-              this.y + this.radius > canvas.height ||
-              this.y - this.radius < 0
-            ) {
-              gameOver();
-            }
           }
           flap() {
             this.velocity = settings.lift;
@@ -147,25 +139,23 @@
             this.gap = settings.pipeGap;
             this.passed = false;
 
-            // --- PERBAIKAN FINAL DI SINI ---
-            const minHeight = settings.minPipeHeight;
-            // Pastikan availableSpace tidak pernah negatif
-            const availableSpace = Math.max(
-              0,
-              canvas.height - this.gap - minHeight * 2
-            );
+            // --- LOGIKA BARU YANG DIJAMIN ANTI JEBAKAN ---
+            const edgePadding = 60; // Jarak aman dari tepi atas dan bawah layar
+            const randomRange = canvas.height - this.gap - edgePadding * 2;
+
+            // Pastikan randomRange tidak negatif pada layar yang sangat kecil
+            const safeRandomRange = Math.max(0, randomRange);
+
             this.topHeight =
-              Math.floor(Math.random() * availableSpace) + minHeight;
+              Math.floor(Math.random() * safeRandomRange) + edgePadding;
             this.bottomY = this.topHeight + this.gap;
           }
           draw() {
             ctx.fillStyle = "#22c55e"; // green-500
             ctx.strokeStyle = "#15803d"; // green-700
             ctx.lineWidth = 4;
-            // Top pipe
             ctx.fillRect(this.x, 0, this.width, this.topHeight);
             ctx.strokeRect(this.x, 0, this.width, this.topHeight);
-            // Bottom pipe
             ctx.fillRect(
               this.x,
               this.bottomY,
@@ -186,6 +176,12 @@
             return this.x + this.width < 0;
           }
           collidesWith(bird) {
+            if (
+              bird.y - bird.radius < 0 ||
+              bird.y + bird.radius > canvas.height
+            ) {
+              return true;
+            }
             if (
               bird.x + bird.radius > this.x &&
               bird.x - bird.radius < this.x + this.width
@@ -208,6 +204,7 @@
         }
 
         function init() {
+          resizeCanvas();
           score = 0;
           frameCount = 0;
           gameActive = false;
@@ -294,11 +291,9 @@
         });
 
         function setup() {
-          resizeCanvas();
           init();
           bird.draw();
           window.addEventListener("resize", () => {
-            resizeCanvas();
             init();
             bird.draw();
           });
