@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=no"
     />
-    <title>Modern Snake Game</title>
+    <title>Advanced Snake Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -51,14 +51,26 @@
 
       #game-board {
         background-color: var(--bg-color);
-        cursor: pointer;
         border-radius: 0.75rem;
         border: 1px solid var(--border-color);
+        transition: background-color 0.3s, border-color 0.3s;
       }
 
       .modal-overlay {
         background-color: rgba(0, 0, 0, 0.5);
         backdrop-filter: blur(5px);
+      }
+
+      .control-btn,
+      .setting-btn {
+        background-color: var(--card-bg-color);
+        box-shadow: var(--shadow);
+        color: var(--text-secondary-color);
+      }
+
+      .setting-btn.active {
+        background-color: var(--snake-head-color);
+        color: white;
       }
     </style>
   </head>
@@ -69,120 +81,233 @@
       <!-- Header: Skor dan Tombol Tema -->
       <header class="flex justify-between items-center mb-4">
         <div class="text-left">
-          <h1
-            class="text-2xl font-bold tracking-tight"
-            style="color: var(--text-color)"
-          >
-            Snake
-          </h1>
+          <h1 class="text-2xl font-bold tracking-tight">Snake</h1>
           <p class="text-sm" style="color: var(--text-secondary-color)">
             Skor: <span id="current-score" class="font-bold">0</span>
           </p>
         </div>
-        <div class="text-right">
-          <p class="text-sm font-bold" style="color: var(--text-color)">
-            SKOR TERTINGGI
-          </p>
-          <p
-            id="high-score"
-            class="text-lg font-bold"
-            style="color: var(--text-secondary-color)"
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <p class="text-sm font-bold">SKOR TERTINGGI</p>
+            <p
+              id="high-score"
+              class="text-lg font-bold"
+              style="color: var(--text-secondary-color)"
+            >
+              0
+            </p>
+          </div>
+          <button
+            id="theme-toggle"
+            class="p-2 rounded-full"
+            style="
+              background-color: var(--card-bg-color);
+              box-shadow: var(--shadow);
+            "
           >
-            0
-          </p>
+            <!-- Icon will be filled by JS -->
+          </button>
         </div>
       </header>
 
       <!-- Papan Permainan -->
       <div
-        class="relative w-full aspect-square"
-        style="box-shadow: var(--shadow); border-radius: 0.75rem"
+        class="relative w-full aspect-square rounded-xl"
+        style="box-shadow: var(--shadow)"
       >
         <canvas id="game-board" class="w-full h-full"></canvas>
-        <!-- Modal Game Over -->
+
+        <!-- Overlay Jeda -->
         <div
-          id="game-over-modal"
+          id="pause-overlay"
           class="absolute inset-0 z-10 flex-col items-center justify-center p-4 transition-opacity duration-300 bg-black bg-opacity-50 backdrop-blur-sm rounded-xl opacity-0 pointer-events-none hidden"
         >
-          <div class="text-center text-white">
-            <h2 class="text-4xl font-bold">Game Over</h2>
-            <p class="mt-2 mb-6">
-              Skor akhirmu adalah
-              <span id="final-score" class="font-bold">0</span>
-            </p>
-            <button
-              id="restart-button"
-              class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition-transform transform hover:scale-105"
-            >
-              Main Lagi
-            </button>
-          </div>
+          <h2 class="text-4xl font-bold text-white">Jeda</h2>
         </div>
+
+        <!-- Tombol Jeda -->
+        <button
+          id="pause-button"
+          class="absolute top-2 right-2 z-20 p-2 rounded-full text-white bg-black bg-opacity-20 hover:bg-opacity-40"
+        >
+          <!-- Icon will be filled by JS -->
+        </button>
       </div>
 
       <!-- Kontrol Mobile -->
       <div class="grid grid-cols-3 grid-rows-2 gap-3 mt-4 md:hidden">
         <div></div>
-        <button
-          data-direction="up"
-          class="control-btn bg-white dark:bg-gray-700 p-4 rounded-lg"
-          style="box-shadow: var(--shadow)"
-        >
+        <button data-direction="up" class="control-btn p-4 rounded-lg">
           &#8593;
         </button>
         <div></div>
-        <button
-          data-direction="left"
-          class="control-btn bg-white dark:bg-gray-700 p-4 rounded-lg"
-          style="box-shadow: var(--shadow)"
-        >
+        <button data-direction="left" class="control-btn p-4 rounded-lg">
           &#8592;
         </button>
-        <button
-          data-direction="down"
-          class="control-btn bg-white dark:bg-gray-700 p-4 rounded-lg"
-          style="box-shadow: var(--shadow)"
-        >
+        <button data-direction="down" class="control-btn p-4 rounded-lg">
           &#8595;
         </button>
-        <button
-          data-direction="right"
-          class="control-btn bg-white dark:bg-gray-700 p-4 rounded-lg"
-          style="box-shadow: var(--shadow)"
-        >
+        <button data-direction="right" class="control-btn p-4 rounded-lg">
           &#8594;
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal Pengaturan & Game Over -->
+    <div
+      id="modal-container"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay"
+    >
+      <div
+        id="settings-modal"
+        class="w-full max-w-sm p-6 rounded-2xl"
+        style="
+          background-color: var(--card-bg-color);
+          box-shadow: var(--shadow);
+        "
+      >
+        <h2 class="text-2xl font-bold text-center mb-4">Pengaturan Game</h2>
+
+        <div class="mb-4">
+          <label class="font-semibold mb-2 block">Kesulitan (Kecepatan)</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              class="setting-btn difficulty-btn p-2 rounded-lg"
+              data-speed="150"
+            >
+              Easy
+            </button>
+            <button
+              class="setting-btn difficulty-btn p-2 rounded-lg active"
+              data-speed="100"
+            >
+              Normal
+            </button>
+            <button
+              class="setting-btn difficulty-btn p-2 rounded-lg"
+              data-speed="70"
+            >
+              Hard
+            </button>
+            <button
+              class="setting-btn difficulty-btn p-2 rounded-lg"
+              data-speed="50"
+            >
+              Master
+            </button>
+          </div>
+        </div>
+
+        <div class="mb-6">
+          <label class="font-semibold mb-2 block">Mode Dinding</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              class="setting-btn walls-btn active p-2 rounded-lg"
+              data-walls="false"
+            >
+              Tembus
+            </button>
+            <button
+              class="setting-btn walls-btn p-2 rounded-lg"
+              data-walls="true"
+            >
+              Mematikan
+            </button>
+          </div>
+        </div>
+
+        <button
+          id="start-game-button"
+          class="w-full text-white font-bold py-3 px-6 rounded-lg text-lg transition-transform transform hover:scale-105"
+          style="background-color: var(--snake-head-color)"
+        >
+          Mulai Bermain
+        </button>
+      </div>
+
+      <div
+        id="game-over-modal"
+        class="w-full max-w-sm p-6 rounded-2xl text-center hidden"
+        style="
+          background-color: var(--card-bg-color);
+          box-shadow: var(--shadow);
+        "
+      >
+        <h2 class="text-4xl font-bold">Game Over</h2>
+        <p class="mt-2 mb-6" style="color: var(--text-secondary-color)">
+          Skor akhirmu:
+          <span
+            id="final-score"
+            class="font-bold text-xl"
+            style="color: var(--text-color)"
+            >0</span
+          >
+        </p>
+        <button
+          id="restart-button"
+          class="w-full text-white font-bold py-3 px-6 rounded-lg text-lg transition-transform transform hover:scale-105"
+          style="background-color: var(--snake-head-color)"
+        >
+          Main Lagi
         </button>
       </div>
     </div>
 
     <script>
       document.addEventListener("DOMContentLoaded", () => {
+        // --- Elemen DOM ---
         const canvas = document.getElementById("game-board");
         const ctx = canvas.getContext("2d");
-
+        const themeToggle = document.getElementById("theme-toggle");
         const currentScoreEl = document.getElementById("current-score");
         const highScoreEl = document.getElementById("high-score");
+        const modalContainer = document.getElementById("modal-container");
+        const settingsModal = document.getElementById("settings-modal");
         const gameOverModal = document.getElementById("game-over-modal");
         const finalScoreEl = document.getElementById("final-score");
+        const startGameButton = document.getElementById("start-game-button");
         const restartButton = document.getElementById("restart-button");
+        const pauseButton = document.getElementById("pause-button");
+        const pauseOverlay = document.getElementById("pause-overlay");
 
+        // --- Ikon ---
+        const sunIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+        const moonIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+        const pauseIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+        const playIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+
+        // --- State Game ---
         const gridSize = 20;
-        let canvasSize;
+        let snake,
+          food,
+          score,
+          highScore,
+          direction,
+          gameLoop,
+          gameSpeed,
+          wallsAreLethal,
+          isPaused;
 
-        let snake, food, score, highScore, direction, gameLoop, gameActive;
+        // --- Pengaturan Game ---
+        let gameSettings = {
+          speed: 100,
+          walls: false,
+        };
 
         const initGame = () => {
           snake = [{ x: 10, y: 10 }];
-          food = {};
           score = 0;
           highScore = localStorage.getItem("snakeHighScore") || 0;
           direction = "right";
-          gameActive = true;
+          isPaused = false;
+
+          gameSpeed = gameSettings.speed;
+          wallsAreLethal = gameSettings.walls;
 
           currentScoreEl.textContent = score;
           highScoreEl.textContent = highScore;
-
-          gameOverModal.classList.add(
+          pauseButton.innerHTML = pauseIcon;
+          pauseOverlay.classList.add(
             "opacity-0",
             "pointer-events-none",
             "hidden"
@@ -190,15 +315,14 @@
 
           placeFood();
           if (gameLoop) clearInterval(gameLoop);
-          gameLoop = setInterval(main, 100);
+          gameLoop = setInterval(main, gameSpeed);
         };
 
         const resizeCanvas = () => {
           const container = canvas.parentElement;
-          const size = Math.min(container.clientWidth, container.clientHeight);
+          const size = container.clientWidth;
           canvas.width = size;
           canvas.height = size;
-          canvasSize = size;
         };
 
         const placeFood = () => {
@@ -209,51 +333,68 @@
         };
 
         const draw = () => {
+          // Get computed styles for colors
+          const snakeHeadColor = getComputedStyle(
+            document.documentElement
+          ).getPropertyValue("--snake-head-color");
+          const snakeBodyColor = getComputedStyle(
+            document.documentElement
+          ).getPropertyValue("--snake-body-color");
+          const foodColor = getComputedStyle(
+            document.documentElement
+          ).getPropertyValue("--food-color");
+          const bgColor = getComputedStyle(
+            document.documentElement
+          ).getPropertyValue("--bg-color");
+
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-          // Draw snake
           snake.forEach((segment, index) => {
-            ctx.fillStyle =
-              index === 0
-                ? "var(--snake-head-color)"
-                : "var(--snake-body-color)";
+            ctx.fillStyle = index === 0 ? snakeHeadColor : snakeBodyColor;
             ctx.fillRect(
               segment.x * gridSize,
               segment.y * gridSize,
-              gridSize,
-              gridSize
-            );
-            ctx.strokeStyle = "var(--bg-color)";
-            ctx.strokeRect(
-              segment.x * gridSize,
-              segment.y * gridSize,
-              gridSize,
-              gridSize
+              gridSize - 1,
+              gridSize - 1
             );
           });
 
-          // Draw food
-          ctx.fillStyle = "var(--food-color)";
+          ctx.fillStyle = foodColor;
           ctx.fillRect(
             food.x * gridSize,
             food.y * gridSize,
-            gridSize,
-            gridSize
+            gridSize - 1,
+            gridSize - 1
           );
         };
 
         const update = () => {
-          if (!gameActive) return;
-
           const head = { ...snake[0] };
           if (direction === "up") head.y--;
           if (direction === "down") head.y++;
           if (direction === "left") head.x--;
           if (direction === "right") head.x++;
 
+          // Wall Logic
+          if (wallsAreLethal) {
+            if (
+              head.x < 0 ||
+              head.x >= canvas.width / gridSize ||
+              head.y < 0 ||
+              head.y >= canvas.height / gridSize
+            ) {
+              return gameOver();
+            }
+          } else {
+            // Wall pass-through logic
+            if (head.x < 0) head.x = canvas.width / gridSize - 1;
+            if (head.x >= canvas.width / gridSize) head.x = 0;
+            if (head.y < 0) head.y = canvas.height / gridSize - 1;
+            if (head.y >= canvas.height / gridSize) head.y = 0;
+          }
+
           snake.unshift(head);
 
-          // Check for collision with food
           if (head.x === food.x && head.y === food.y) {
             score++;
             currentScoreEl.textContent = score;
@@ -262,82 +403,147 @@
             snake.pop();
           }
 
-          // Check for collision with walls or self
-          if (
-            head.x < 0 ||
-            head.x >= canvas.width / gridSize ||
-            head.y < 0 ||
-            head.y >= canvas.height / gridSize ||
-            checkSelfCollision()
-          ) {
-            gameOver();
+          if (checkSelfCollision()) {
+            return gameOver();
           }
         };
 
         const checkSelfCollision = () => {
           const head = snake[0];
           for (let i = 1; i < snake.length; i++) {
-            if (head.x === snake[i].x && head.y === snake[i].y) {
-              return true;
-            }
+            if (head.x === snake[i].x && head.y === snake[i].y) return true;
           }
           return false;
         };
 
         const gameOver = () => {
-          gameActive = false;
           clearInterval(gameLoop);
-
           if (score > highScore) {
             highScore = score;
             localStorage.setItem("snakeHighScore", highScore);
             highScoreEl.textContent = highScore;
           }
-
           finalScoreEl.textContent = score;
+          settingsModal.classList.add("hidden");
           gameOverModal.classList.remove("hidden");
-          setTimeout(() => {
-            gameOverModal.classList.remove("opacity-0", "pointer-events-none");
-          }, 10);
+          modalContainer.classList.remove("opacity-0", "pointer-events-none");
         };
 
         const main = () => {
+          if (isPaused) return;
           update();
           draw();
         };
 
         const changeDirection = (newDirection) => {
-          if (newDirection === "up" && direction !== "down")
-            direction = newDirection;
-          if (newDirection === "down" && direction !== "up")
-            direction = newDirection;
-          if (newDirection === "left" && direction !== "right")
-            direction = newDirection;
-          if (newDirection === "right" && direction !== "left")
-            direction = newDirection;
+          if (isPaused) return;
+          const goingUp = direction === "up";
+          const goingDown = direction === "down";
+          const goingLeft = direction === "left";
+          const goingRight = direction === "right";
+
+          if (newDirection === "up" && !goingDown) direction = newDirection;
+          if (newDirection === "down" && !goingUp) direction = newDirection;
+          if (newDirection === "left" && !goingRight) direction = newDirection;
+          if (newDirection === "right" && !goingLeft) direction = newDirection;
         };
 
-        // Event Listeners
+        const togglePause = () => {
+          isPaused = !isPaused;
+          if (isPaused) {
+            pauseButton.innerHTML = playIcon;
+            pauseOverlay.classList.remove(
+              "opacity-0",
+              "pointer-events-none",
+              "hidden"
+            );
+          } else {
+            pauseButton.innerHTML = pauseIcon;
+            pauseOverlay.classList.add(
+              "opacity-0",
+              "pointer-events-none",
+              "hidden"
+            );
+          }
+        };
+
+        // --- Event Listeners ---
         document.addEventListener("keydown", (e) => {
           if (e.key === "ArrowUp") changeDirection("up");
           if (e.key === "ArrowDown") changeDirection("down");
           if (e.key === "ArrowLeft") changeDirection("left");
           if (e.key === "ArrowRight") changeDirection("right");
+          if (e.key === " ") {
+            // Space bar to pause
+            e.preventDefault();
+            togglePause();
+          }
         });
 
         document.querySelectorAll(".control-btn").forEach((button) => {
-          button.addEventListener("click", () => {
-            const newDirection = button.dataset.direction;
-            changeDirection(newDirection);
+          button.addEventListener("click", () =>
+            changeDirection(button.dataset.direction)
+          );
+        });
+
+        startGameButton.addEventListener("click", () => {
+          modalContainer.classList.add("opacity-0", "pointer-events-none");
+          initGame();
+        });
+
+        restartButton.addEventListener("click", () => {
+          gameOverModal.classList.add("hidden");
+          settingsModal.classList.remove("hidden");
+        });
+
+        pauseButton.addEventListener("click", togglePause);
+
+        // Settings Logic
+        document.querySelectorAll(".difficulty-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            document
+              .querySelector(".difficulty-btn.active")
+              .classList.remove("active");
+            btn.classList.add("active");
+            gameSettings.speed = parseInt(btn.dataset.speed);
+          });
+        });
+        document.querySelectorAll(".walls-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            document
+              .querySelector(".walls-btn.active")
+              .classList.remove("active");
+            btn.classList.add("active");
+            gameSettings.walls = btn.dataset.walls === "true";
           });
         });
 
-        restartButton.addEventListener("click", initGame);
-        window.addEventListener("resize", resizeCanvas);
+        // Theme Logic
+        const toggleTheme = () => {
+          const html = document.documentElement;
+          const isDark = html.classList.toggle("dark");
+          html.classList.toggle("light", !isDark);
+          themeToggle.innerHTML = isDark ? sunIcon : moonIcon;
+          localStorage.setItem("snakeTheme", isDark ? "dark" : "light");
+          draw(); // Redraw canvas with new colors
+        };
+        themeToggle.addEventListener("click", toggleTheme);
 
-        // Init
-        resizeCanvas();
-        initGame();
+        // --- Inisialisasi ---
+        const init = () => {
+          const savedTheme = localStorage.getItem("snakeTheme") || "light";
+          document.documentElement.className = savedTheme;
+          themeToggle.innerHTML = savedTheme === "dark" ? sunIcon : moonIcon;
+          pauseButton.innerHTML = pauseIcon;
+
+          resizeCanvas();
+          window.addEventListener("resize", () => {
+            resizeCanvas();
+            draw();
+          });
+        };
+
+        init();
       });
     </script>
   </body>
