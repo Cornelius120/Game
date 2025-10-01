@@ -321,15 +321,29 @@
         const resizeCanvas = () => {
           const container = canvas.parentElement;
           const size = container.clientWidth;
-          canvas.width = size;
-          canvas.height = size;
+          // Pastikan ukuran canvas adalah kelipatan dari gridSize untuk grid yang sempurna
+          const numCells = Math.floor(size / gridSize);
+          canvas.width = numCells * gridSize;
+          canvas.height = numCells * gridSize;
+        };
+
+        const isPositionOnSnake = (position) => {
+          return snake.some(
+            (segment) => segment.x === position.x && segment.y === position.y
+          );
         };
 
         const placeFood = () => {
-          food = {
-            x: Math.floor(Math.random() * (canvas.width / gridSize)),
-            y: Math.floor(Math.random() * (canvas.height / gridSize)),
-          };
+          const numCellsX = canvas.width / gridSize;
+          const numCellsY = canvas.height / gridSize;
+          let newFoodPosition;
+          do {
+            newFoodPosition = {
+              x: Math.floor(Math.random() * numCellsX),
+              y: Math.floor(Math.random() * numCellsY),
+            };
+          } while (isPositionOnSnake(newFoodPosition)); // Ulangi jika makanan muncul di tubuh ular
+          food = newFoodPosition;
         };
 
         const draw = () => {
@@ -343,9 +357,6 @@
           const foodColor = getComputedStyle(
             document.documentElement
           ).getPropertyValue("--food-color");
-          const bgColor = getComputedStyle(
-            document.documentElement
-          ).getPropertyValue("--bg-color");
 
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -426,7 +437,12 @@
           finalScoreEl.textContent = score;
           settingsModal.classList.add("hidden");
           gameOverModal.classList.remove("hidden");
-          modalContainer.classList.remove("opacity-0", "pointer-events-none");
+          modalContainer.classList.remove(
+            "opacity-0",
+            "pointer-events-none",
+            "hidden"
+          );
+          modalContainer.classList.remove("hidden");
         };
 
         const main = () => {
@@ -457,6 +473,7 @@
               "pointer-events-none",
               "hidden"
             );
+            pauseOverlay.classList.remove("hidden");
           } else {
             pauseButton.innerHTML = pauseIcon;
             pauseOverlay.classList.add(
@@ -469,14 +486,17 @@
 
         // --- Event Listeners ---
         document.addEventListener("keydown", (e) => {
-          if (e.key === "ArrowUp") changeDirection("up");
-          if (e.key === "ArrowDown") changeDirection("down");
-          if (e.key === "ArrowLeft") changeDirection("left");
-          if (e.key === "ArrowRight") changeDirection("right");
-          if (e.key === " ") {
-            // Space bar to pause
-            e.preventDefault();
-            togglePause();
+          if (modalContainer.classList.contains("hidden")) {
+            // Only control game if modal is hidden
+            if (e.key === "ArrowUp") changeDirection("up");
+            if (e.key === "ArrowDown") changeDirection("down");
+            if (e.key === "ArrowLeft") changeDirection("left");
+            if (e.key === "ArrowRight") changeDirection("right");
+            if (e.key === " ") {
+              // Space bar to pause
+              e.preventDefault();
+              togglePause();
+            }
           }
         });
 
@@ -487,13 +507,14 @@
         });
 
         startGameButton.addEventListener("click", () => {
-          modalContainer.classList.add("opacity-0", "pointer-events-none");
+          modalContainer.classList.add("hidden");
           initGame();
         });
 
         restartButton.addEventListener("click", () => {
           gameOverModal.classList.add("hidden");
           settingsModal.classList.remove("hidden");
+          modalContainer.classList.remove("hidden");
         });
 
         pauseButton.addEventListener("click", togglePause);
@@ -525,7 +546,10 @@
           html.classList.toggle("light", !isDark);
           themeToggle.innerHTML = isDark ? sunIcon : moonIcon;
           localStorage.setItem("snakeTheme", isDark ? "dark" : "light");
-          draw(); // Redraw canvas with new colors
+          if (!isPaused) {
+            // Redraw canvas only if game is running
+            draw();
+          }
         };
         themeToggle.addEventListener("click", toggleTheme);
 
@@ -539,7 +563,7 @@
           resizeCanvas();
           window.addEventListener("resize", () => {
             resizeCanvas();
-            draw();
+            if (snake) draw(); // Only draw if game has started
           });
         };
 
