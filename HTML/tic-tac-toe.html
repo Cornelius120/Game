@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game Tic-Tac-Toe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* CSS Kustom untuk Game */
+      body {
+        font-family: "Poppins", sans-serif;
+        touch-action: manipulation; /* Mencegah zoom saat di-tap di mobile */
+      }
+
+      .board-cell {
+        /* Styling untuk setiap kotak di papan permainan */
+        width: 100px;
+        height: 100px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.2s ease-in-out;
+        border: 2px solid #e2e8f0; /* border-gray-200 */
+      }
+
+      .board-cell:hover {
+        background-color: #f7fafc; /* bg-gray-50 */
+      }
+
+      .board-cell.x {
+        color: #ef4444; /* text-red-500 */
+      }
+
+      .board-cell.o {
+        color: #3b82f6; /* text-blue-500 */
+      }
+
+      .winning-cell {
+        background-color: #a7f3d0; /* bg-green-200 */
+      }
+
+      /* Ukuran responsif untuk layar kecil */
+      @media (max-width: 640px) {
+        .board-cell {
+          width: 80px;
+          height: 80px;
+          font-size: 2.5rem;
+        }
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4"
+  >
+    <!-- Kontainer utama untuk game -->
+    <div
+      id="game-container"
+      class="bg-white p-6 sm:p-8 rounded-2xl shadow-xl text-center w-full max-w-md"
+    >
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">
+        Tic-Tac-Toe
+      </h1>
+      <p
+        id="status-display"
+        class="text-lg text-gray-600 mb-6 h-12 flex items-center justify-center"
+      >
+        Giliran X untuk memulai
+      </p>
+
+      <!-- Papan permainan -->
+      <div id="game-board" class="grid grid-cols-3 gap-2 mx-auto mb-6">
+        <!-- Sel-sel papan akan dibuat oleh JavaScript -->
+      </div>
+
+      <!-- Tombol untuk memulai ulang permainan -->
+      <button
+        id="restart-button"
+        class="w-full bg-indigo-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform transform hover:scale-105"
+      >
+        Mulai Ulang
+      </button>
+    </div>
+
+    <script>
+      // --- ELEMEN DOM ---
+      const statusDisplay = document.getElementById("status-display");
+      const gameBoard = document.getElementById("game-board");
+      const restartButton = document.getElementById("restart-button");
+
+      // --- STATE GAME ---
+      let gameActive = true;
+      let currentPlayer = "X";
+      // Merepresentasikan 9 kotak di papan, string kosong berarti kosong
+      let gameState = ["", "", "", "", "", "", "", "", ""];
+
+      // --- KONDISI KEMENANGAN ---
+      // Array yang berisi semua kemungkinan kombinasi kemenangan
+      const winningConditions = [
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8], // Baris
+        [0, 3, 6],
+        [1, 4, 7],
+        [2, 5, 8], // Kolom
+        [0, 4, 8],
+        [2, 4, 6], // Diagonal
+      ];
+
+      // --- FUNGSI TAMPILAN PESAN ---
+      const winningMessage = () => `Pemain ${currentPlayer} Menang!`;
+      const drawMessage = () => `Permainan Berakhir Seri!`;
+      const currentPlayerTurn = () => `Giliran Pemain ${currentPlayer}`;
+
+      // --- FUNGSI UTAMA GAME ---
+
+      // Fungsi untuk membuat sel papan permainan secara dinamis
+      function createBoard() {
+        gameBoard.innerHTML = ""; // Kosongkan papan sebelum membuat yang baru
+        for (let i = 0; i < 9; i++) {
+          const cell = document.createElement("div");
+          cell.classList.add("board-cell", "rounded-lg");
+          cell.setAttribute("data-cell-index", i);
+          cell.addEventListener("click", handleCellClick);
+          gameBoard.appendChild(cell);
+        }
+      }
+
+      // Fungsi yang dijalankan saat sebuah sel di-klik
+      function handleCellClick(event) {
+        const clickedCell = event.target;
+        const clickedCellIndex = parseInt(
+          clickedCell.getAttribute("data-cell-index")
+        );
+
+        // Abaikan klik jika sel sudah diisi atau game sudah tidak aktif
+        if (gameState[clickedCellIndex] !== "" || !gameActive) {
+          return;
+        }
+
+        // Proses langkah pemain
+        handleCellPlayed(clickedCell, clickedCellIndex);
+        // Periksa hasil dari langkah tersebut
+        handleResultValidation();
+      }
+
+      // Mengupdate state dan UI setelah sel dimainkan
+      function handleCellPlayed(clickedCell, clickedCellIndex) {
+        gameState[clickedCellIndex] = currentPlayer;
+        clickedCell.textContent = currentPlayer;
+        clickedCell.classList.add(currentPlayer.toLowerCase()); // Menambahkan kelas 'x' atau 'o'
+      }
+
+      // Memeriksa apakah ada pemenang atau seri
+      function handleResultValidation() {
+        let roundWon = false;
+        let winningCombo = [];
+
+        for (let i = 0; i < winningConditions.length; i++) {
+          const winCondition = winningConditions[i];
+          let a = gameState[winCondition[0]];
+          let b = gameState[winCondition[1]];
+          let c = gameState[winCondition[2]];
+
+          if (a === "" || b === "" || c === "") {
+            continue; // Lewati jika ada sel kosong di kombinasi ini
+          }
+          if (a === b && b === c) {
+            roundWon = true;
+            winningCombo = winCondition;
+            break;
+          }
+        }
+
+        if (roundWon) {
+          statusDisplay.textContent = winningMessage();
+          gameActive = false;
+          // Sorot sel yang menang
+          winningCombo.forEach((index) => {
+            document
+              .querySelector(`[data-cell-index='${index}']`)
+              .classList.add("winning-cell");
+          });
+          return;
+        }
+
+        // Cek jika permainan seri (tidak ada sel kosong lagi)
+        let roundDraw = !gameState.includes("");
+        if (roundDraw) {
+          statusDisplay.textContent = drawMessage();
+          gameActive = false;
+          return;
+        }
+
+        // Jika belum ada pemenang atau seri, ganti giliran pemain
+        handlePlayerChange();
+      }
+
+      // Mengganti pemain saat ini
+      function handlePlayerChange() {
+        currentPlayer = currentPlayer === "X" ? "O" : "X";
+        statusDisplay.textContent = currentPlayerTurn();
+      }
+
+      // Mengatur ulang game ke kondisi awal
+      function handleRestartGame() {
+        gameActive = true;
+        currentPlayer = "X";
+        gameState = ["", "", "", "", "", "", "", "", ""];
+        statusDisplay.textContent = currentPlayerTurn();
+        // Hapus semua tanda dari sel
+        document.querySelectorAll(".board-cell").forEach((cell) => {
+          cell.textContent = "";
+          cell.classList.remove("x", "o", "winning-cell");
+        });
+      }
+
+      // --- INISIALISASI GAME ---
+
+      // Buat papan permainan saat halaman dimuat
+      createBoard();
+      // Atur pesan status awal
+      statusDisplay.textContent = currentPlayerTurn();
+      // Tambahkan event listener ke tombol restart
+      restartButton.addEventListener("click", handleRestartGame);
+    </script>
+  </body>
+</html>
