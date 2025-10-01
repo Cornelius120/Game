@@ -40,9 +40,6 @@
       #game-canvas {
         background-color: #000;
         border-radius: 0.75rem;
-        width: 100%;
-        height: 100%;
-        display: block;
       }
       .modal-overlay {
         background-color: rgba(0, 0, 0, 0.7);
@@ -171,8 +168,6 @@
             this.width = 30;
             this.height = 20;
           }
-          // --- PERBAIKAN DI SINI ---
-          // Draw method sekarang menerima posisi grid (offsetX, offsetY)
           draw(offsetX, offsetY) {
             const absoluteX = this.x + offsetX;
             const absoluteY = this.y + offsetY;
@@ -217,7 +212,10 @@
         }
 
         function init() {
-          resizeCanvas(); // Tambahkan ini di awal!
+          // --- INI PERBAIKANNYA ---
+          // Selalu ukur ulang canvas setiap kali game diinisialisasi
+          resizeCanvas();
+
           score = 0;
           lives = 3;
           keys = {};
@@ -274,8 +272,6 @@
             const invaderX = invader.x + invaders.position.x;
             const invaderY = invader.y + invaders.position.y;
 
-            // --- PERBAIKAN DI SINI ---
-            // Menggunakan draw method yang sudah diperbaiki
             invader.draw(invaders.position.x, invaders.position.y);
 
             bullets.forEach((bullet, j) => {
@@ -287,7 +283,6 @@
               ) {
                 setTimeout(() => {
                   if (invaders.invaders[i] === invader) {
-                    // Pastikan invader masih ada
                     invaders.invaders.splice(i, 1);
                     bullets.splice(j, 1);
                     score += 100;
@@ -328,7 +323,7 @@
           modal.style.display = "none";
           gameActive = true;
           Tone.start();
-          init();
+          init(); // Cukup panggil init, karena init sudah memanggil resizeCanvas
           gameLoop();
         }
 
@@ -349,7 +344,6 @@
         window.addEventListener("keydown", ({ key }) => {
           keys[key] = true;
           if (key === " " && gameActive && bullets.length < 3) {
-            // Batasi jumlah peluru di layar
             bullets.push(
               new Bullet(
                 player.x + player.width / 2 - 2,
@@ -367,12 +361,8 @@
         modalButton.addEventListener("click", startGame);
 
         function setup() {
-          resizeCanvas();
-          init();
-          window.addEventListener("resize", () => {
-            resizeCanvas();
-            init();
-          });
+          init(); // Panggil init di awal
+          window.addEventListener("resize", init); // Panggil init saat layar di-resize
         }
         setup();
       });
