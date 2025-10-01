@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Modern Pong Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Poppins", sans-serif;
+        background-color: #111827;
+      }
+      #game-canvas {
+        background-color: #000;
+        border-radius: 0.75rem;
+        cursor: none;
+      }
+      .modal-overlay {
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(5px);
+      }
+    </style>
+  </head>
+  <body
+    class="flex flex-col items-center justify-center min-h-screen p-4 overflow-hidden"
+  >
+    <div class="w-full max-w-2xl mx-auto">
+      <header class="text-center mb-4 text-white">
+        <h1 class="text-3xl font-bold">PONG</h1>
+        <div
+          class="flex justify-center items-center gap-8 mt-2 text-5xl font-bold"
+        >
+          <div id="player-score">0</div>
+          <div>-</div>
+          <div id="cpu-score">0</div>
+        </div>
+      </header>
+
+      <div class="relative w-full aspect-[16/9] rounded-xl shadow-2xl">
+        <canvas id="game-canvas"></canvas>
+        <div
+          id="modal"
+          class="absolute inset-0 z-10 flex items-center justify-center modal-overlay rounded-xl"
+        >
+          <div class="text-center text-white p-4">
+            <h2 id="modal-title" class="text-4xl font-bold mb-2">PONG</h2>
+            <p id="modal-text" class="mb-6">
+              Gerakkan mouse untuk mengontrol papanmu.
+            </p>
+            <button
+              id="modal-button"
+              class="bg-blue-500 hover:bg-blue-600 font-bold py-3 px-8 rounded-lg text-lg"
+            >
+              Mulai
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const canvas = document.getElementById("game-canvas");
+        const ctx = canvas.getContext("2d");
+        const playerScoreEl = document.getElementById("player-score");
+        const cpuScoreEl = document.getElementById("cpu-score");
+        const modal = document.getElementById("modal");
+        const modalTitle = document.getElementById("modal-title");
+        const modalText = document.getElementById("modal-text");
+        const modalButton = document.getElementById("modal-button");
+
+        const hitSound = new Tone.Synth({
+          oscillator: { type: "sine" },
+          envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 },
+        }).toDestination();
+        const scoreSound = new Tone.Synth({
+          oscillator: { type: "triangle" },
+          envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 },
+        }).toDestination();
+
+        let ball,
+          player,
+          cpu,
+          playerScore,
+          cpuScore,
+          gameActive,
+          animationFrameId;
+
+        const PADDLE_HEIGHT = 100;
+        const PADDLE_WIDTH = 10;
+        const BALL_RADIUS = 8;
+
+        class Paddle {
+          constructor(x) {
+            this.x = x;
+            this.y = canvas.height / 2 - PADDLE_HEIGHT / 2;
+            this.width = PADDLE_WIDTH;
+            this.height = PADDLE_HEIGHT;
+            this.speed = 10;
+          }
+          draw(color) {
+            ctx.fillStyle = color;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 15;
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            ctx.shadowBlur = 0;
+          }
+        }
+
+        class Ball {
+          constructor() {
+            this.x = canvas.width / 2;
+            this.y = canvas.height / 2;
+            this.radius = BALL_RADIUS;
+            this.speed = 5;
+            this.dx = this.speed * (Math.random() < 0.5 ? 1 : -1);
+            this.dy = this.speed * (Math.random() < 0.5 ? 1 : -1);
+          }
+          draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = "#fff";
+            ctx.shadowColor = "#fff";
+            ctx.shadowBlur = 15;
+            ctx.fill();
+            ctx.closePath();
+            ctx.shadowBlur = 0;
+          }
+          update() {
+            this.x += this.dx;
+            this.y += this.dy;
+
+            // Bounce off top/bottom walls
+            if (
+              this.y + this.radius > canvas.height ||
+              this.y - this.radius < 0
+            ) {
+              this.dy *= -1;
+              hitSound.triggerAttackRelease("C4", "8n");
+            }
+          }
+          reset() {
+            this.x = canvas.width / 2;
+            this.y = canvas.height / 2;
+            this.dx = this.speed * (Math.random() < 0.5 ? 1 : -1);
+            this.dy = this.speed * (Math.random() < 0.5 ? 1 : -1);
+          }
+        }
+
+        function resizeCanvas() {
+          const container = canvas.parentElement;
+          canvas.width = container.clientWidth;
+          canvas.height = container.clientHeight;
+        }
+
+        function init() {
+          resizeCanvas();
+          playerScore = 0;
+          cpuScore = 0;
+          gameActive = false;
+
+          player = new Paddle(10);
+          cpu = new Paddle(canvas.width - 10 - PADDLE_WIDTH);
+          ball = new Ball();
+          updateUI();
+        }
+
+        function updateUI() {
+          playerScoreEl.innerText = playerScore;
+          cpuScoreEl.innerText = cpuScore;
+        }
+
+        function drawNet() {
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+          ctx.lineWidth = 4;
+          ctx.setLineDash([15, 15]);
+          ctx.beginPath();
+          ctx.moveTo(canvas.width / 2, 0);
+          ctx.lineTo(canvas.width / 2, canvas.height);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        function gameLoop() {
+          if (!gameActive) return;
+          animationFrameId = requestAnimationFrame(gameLoop);
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          drawNet();
+          player.draw("#3b82f6"); // Blue
+          cpu.draw("#ef4444"); // Red
+          ball.update();
+          ball.draw();
+
+          // Player paddle collision
+          if (
+            ball.x - ball.radius < player.x + player.width &&
+            ball.y > player.y &&
+            ball.y < player.y + player.height
+          ) {
+            ball.dx *= -1;
+            hitSound.triggerAttackRelease("G4", "8n");
+          }
+
+          // CPU paddle collision
+          if (
+            ball.x + ball.radius > cpu.x &&
+            ball.y > cpu.y &&
+            ball.y < cpu.y + cpu.height
+          ) {
+            ball.dx *= -1;
+            hitSound.triggerAttackRelease("G4", "8n");
+          }
+
+          // CPU AI
+          const cpuLevel = 0.08;
+          cpu.y += (ball.y - (cpu.y + cpu.height / 2)) * cpuLevel;
+
+          // Score logic
+          if (ball.x + ball.radius < 0) {
+            cpuScore++;
+            scoreSound.triggerAttackRelease("A4", "4n");
+            ball.reset();
+            updateUI();
+          } else if (ball.x - ball.radius > canvas.width) {
+            playerScore++;
+            scoreSound.triggerAttackRelease("E5", "4n");
+            ball.reset();
+            updateUI();
+          }
+
+          if (playerScore >= 5 || cpuScore >= 5) {
+            gameOver(playerScore > cpuScore);
+          }
+        }
+
+        function startGame() {
+          modal.style.display = "none";
+          init();
+          gameActive = true;
+          Tone.start();
+          gameLoop();
+        }
+
+        function gameOver(playerWon) {
+          gameActive = false;
+          cancelAnimationFrame(animationFrameId);
+          modal.style.display = "flex";
+          modalTitle.innerText = playerWon ? "Kamu Menang!" : "Kamu Kalah!";
+          modalText.innerText = `Skor Akhir: ${playerScore} - ${cpuScore}`;
+          modalButton.innerText = "Main Lagi";
+        }
+
+        function handleMouseMove(e) {
+          const rect = canvas.getBoundingClientRect();
+          player.y = e.clientY - rect.top - player.height / 2;
+        }
+
+        modalButton.addEventListener("click", startGame);
+        canvas.addEventListener("mousemove", handleMouseMove);
+
+        function setup() {
+          init();
+          drawNet();
+          player.draw("#3b82f6");
+          cpu.draw("#ef4444");
+          ball.draw();
+          window.addEventListener("resize", setup);
+        }
+        setup();
+      });
+    </script>
+  </body>
+</html>
