@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Modern Space Invaders</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-color: #f3f4f6;
+        --card-bg-color: #ffffff;
+        --text-color: #1f2937;
+        --text-secondary-color: #6b7280;
+        --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+          0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      }
+      html.dark {
+        --bg-color: #000000;
+        --card-bg-color: #1f2937;
+        --text-color: #f9fafb;
+        --text-secondary-color: #9ca3af;
+        --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2),
+          0 4px 6px -2px rgba(0, 0, 0, 0.15);
+      }
+      body {
+        font-family: "Poppins", sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+      }
+      #game-canvas {
+        background-color: #000;
+        border-radius: 0.75rem;
+      }
+      .modal-overlay {
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(5px);
+      }
+    </style>
+  </head>
+  <body
+    class="flex flex-col items-center justify-center min-h-screen p-4 overflow-hidden"
+  >
+    <div class="w-full max-w-lg mx-auto">
+      <header class="flex justify-between items-center mb-4 px-2">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">Space Invaders</h1>
+          <p class="text-sm" style="color: var(--text-secondary-color)">
+            Skor: <span id="score" class="font-bold">0</span>
+          </p>
+        </div>
+        <p class="font-bold text-lg">Nyawa: <span id="lives"></span></p>
+      </header>
+
+      <div
+        class="relative w-full aspect-[4/3] rounded-xl"
+        style="box-shadow: var(--shadow)"
+      >
+        <canvas id="game-canvas"></canvas>
+        <div
+          id="modal"
+          class="absolute inset-0 z-10 flex items-center justify-center modal-overlay rounded-xl"
+        >
+          <div class="text-center text-white">
+            <h2 id="modal-title" class="text-4xl font-bold mb-4">
+              Space Invaders
+            </h2>
+            <p id="modal-text" class="mb-6">
+              Gunakan panah Kiri/Kanan untuk bergerak, Spasi untuk menembak.
+            </p>
+            <button
+              id="modal-button"
+              class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg text-lg"
+            >
+              Mulai
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const canvas = document.getElementById("game-canvas");
+        const ctx = canvas.getContext("2d");
+        const scoreEl = document.getElementById("score");
+        const livesEl = document.getElementById("lives");
+        const modal = document.getElementById("modal");
+        const modalTitle = document.getElementById("modal-title");
+        const modalText = document.getElementById("modal-text");
+        const modalButton = document.getElementById("modal-button");
+
+        const shootSound = new Tone.Synth({
+          oscillator: { type: "square" },
+          envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.1 },
+        }).toDestination();
+        const explosionSound = new Tone.NoiseSynth({
+          noise: { type: "white" },
+          envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 },
+        }).toDestination();
+
+        let player,
+          invaders,
+          bullets,
+          alienBullets,
+          score,
+          lives,
+          keys,
+          gameActive,
+          animationFrameId;
+
+        class Player {
+          constructor() {
+            this.width = 40;
+            this.height = 20;
+            this.x = canvas.width / 2 - this.width / 2;
+            this.y = canvas.height - this.height - 20;
+            this.speed = 5;
+          }
+          draw() {
+            ctx.fillStyle = "#34d399"; // Emerald-400
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            ctx.shadowColor = "#34d399";
+            ctx.shadowBlur = 10;
+          }
+          update() {
+            if (keys["ArrowLeft"] && this.x > 0) this.x -= this.speed;
+            if (keys["ArrowRight"] && this.x < canvas.width - this.width)
+              this.x += this.speed;
+            ctx.shadowBlur = 0;
+          }
+        }
+
+        class Bullet {
+          constructor(x, y, dy, color) {
+            this.x = x;
+            this.y = y;
+            this.width = 4;
+            this.height = 10;
+            this.dy = dy;
+            this.color = color;
+          }
+          draw() {
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            ctx.shadowColor = this.color;
+            ctx.shadowBlur = 10;
+          }
+          update() {
+            this.y += this.dy;
+            ctx.shadowBlur = 0;
+          }
+        }
+
+        class Invader {
+          constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.width = 30;
+            this.height = 20;
+          }
+          draw() {
+            ctx.fillStyle = "#c084fc"; // Purple-400
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+          }
+        }
+
+        class InvaderGrid {
+          constructor() {
+            this.position = { x: 0, y: 0 };
+            this.velocity = { x: 2, y: 0 };
+            this.invaders = [];
+            const columns = Math.floor(Math.random() * 5 + 5);
+            const rows = Math.floor(Math.random() * 3 + 2);
+            this.width = columns * 40;
+            for (let x = 0; x < columns; x++) {
+              for (let y = 0; y < rows; y++) {
+                this.invaders.push(new Invader(x * 40, y * 30));
+              }
+            }
+          }
+          update() {
+            this.position.x += this.velocity.x;
+            this.position.y += this.velocity.y;
+            this.velocity.y = 0;
+
+            if (
+              this.position.x + this.width >= canvas.width ||
+              this.position.x <= 0
+            ) {
+              this.velocity.x *= -1;
+              this.velocity.y = 20;
+            }
+          }
+        }
+
+        function resizeCanvas() {
+          const container = canvas.parentElement;
+          canvas.width = container.clientWidth;
+          canvas.height = container.clientHeight;
+        }
+
+        function init() {
+          score = 0;
+          lives = 3;
+          keys = {};
+          gameActive = false;
+          bullets = [];
+          alienBullets = [];
+
+          player = new Player();
+          invaders = new InvaderGrid();
+          updateUI();
+        }
+
+        function updateUI() {
+          scoreEl.innerText = score.toString();
+          livesEl.innerText = "⭐".repeat(lives);
+        }
+
+        function gameLoop() {
+          if (!gameActive) return;
+          animationFrameId = requestAnimationFrame(gameLoop);
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          player.update();
+          player.draw();
+
+          bullets.forEach((bullet, index) => {
+            if (bullet.y + bullet.height < 0) bullets.splice(index, 1);
+            bullet.update();
+            bullet.draw();
+          });
+
+          alienBullets.forEach((bullet, index) => {
+            if (bullet.y > canvas.height) alienBullets.splice(index, 1);
+            bullet.update();
+            bullet.draw();
+            // Check collision with player
+            if (
+              bullet.y < player.y + player.height &&
+              bullet.y + bullet.height > player.y &&
+              bullet.x < player.x + player.width &&
+              bullet.x + bullet.width > player.x
+            ) {
+              alienBullets.splice(index, 1);
+              playerHit();
+            }
+          });
+
+          invaders.update();
+          invaders.invaders.forEach((invader, i) => {
+            bullets.forEach((bullet, j) => {
+              const invaderX = invader.x + invaders.position.x;
+              const invaderY = invader.y + invaders.position.y;
+              if (
+                bullet.y < invaderY + invader.height &&
+                bullet.y + bullet.height > invaderY &&
+                bullet.x < invaderX + invader.width &&
+                bullet.x + bullet.width > invaderX
+              ) {
+                setTimeout(() => {
+                  invaders.invaders.splice(i, 1);
+                  bullets.splice(j, 1);
+                  score += 100;
+                  explosionSound.triggerAttackRelease("8n");
+                  updateUI();
+                  if (invaders.invaders.length === 0) gameOver(true);
+                }, 0);
+              }
+            });
+            invader.draw(invaders.position.x, invaders.position.y);
+            const invaderX = invader.x + invaders.position.x;
+            const invaderY = invader.y + invaders.position.y;
+            ctx.fillStyle = "#c084fc";
+            ctx.fillRect(invaderX, invaderY, invader.width, invader.height);
+            if (invaderY + invader.height >= player.y) gameOver(false);
+          });
+
+          if (Math.random() < 0.01 && invaders.invaders.length > 0) {
+            const randomInvader =
+              invaders.invaders[
+                Math.floor(Math.random() * invaders.invaders.length)
+              ];
+            const invaderX =
+              randomInvader.x + invaders.position.x + randomInvader.width / 2;
+            const invaderY =
+              randomInvader.y + invaders.position.y + randomInvader.height;
+            alienBullets.push(new Bullet(invaderX, invaderY, 5, "#f472b6")); // Pink-400
+          }
+        }
+
+        function playerHit() {
+          lives--;
+          explosionSound.triggerAttackRelease("4n");
+          updateUI();
+          if (lives <= 0) gameOver(false);
+        }
+
+        function startGame() {
+          modal.style.display = "none";
+          gameActive = true;
+          Tone.start();
+          init();
+          gameLoop();
+        }
+
+        function gameOver(isWin) {
+          gameActive = false;
+          cancelAnimationFrame(animationFrameId);
+          modal.style.display = "flex";
+          if (isWin) {
+            modalTitle.innerText = "Kamu Menang!";
+            modalText.innerText = `Skor Akhir: ${score}`;
+          } else {
+            modalTitle.innerText = "Game Over";
+            modalText.innerText = `Skor Akhir: ${score}`;
+          }
+          modalButton.innerText = "Main Lagi";
+        }
+
+        window.addEventListener("keydown", ({ key }) => {
+          keys[key] = true;
+          if (key === " " && gameActive) {
+            bullets.push(
+              new Bullet(
+                player.x + player.width / 2 - 2,
+                player.y,
+                -7,
+                "#fcd34d"
+              )
+            ); // Amber-300
+            shootSound.triggerAttackRelease("C5", "16n");
+          }
+        });
+        window.addEventListener("keyup", ({ key }) => {
+          keys[key] = false;
+        });
+        modalButton.addEventListener("click", startGame);
+
+        function setup() {
+          resizeCanvas();
+          init();
+          window.addEventListener("resize", () => {
+            resizeCanvas();
+            init();
+          });
+        }
+        setup();
+      });
+    </script>
+  </body>
+</html>
