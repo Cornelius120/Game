@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Modern Breakout Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-color: #f3f4f6;
+        --card-bg-color: #ffffff;
+        --text-color: #1f2937;
+        --text-secondary-color: #6b7280;
+        --border-color: #e5e7eb;
+        --paddle-color: #2563eb;
+        --ball-color: #ef4444;
+        --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+          0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      }
+      html.dark {
+        --bg-color: #000000;
+        --card-bg-color: #1f2937;
+        --text-color: #f9fafb;
+        --text-secondary-color: #9ca3af;
+        --border-color: #374151;
+        --paddle-color: #60a5fa;
+        --ball-color: #f87171;
+        --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2),
+          0 4px 6px -2px rgba(0, 0, 0, 0.15);
+      }
+      body {
+        font-family: "Poppins", sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        transition: background-color 0.3s;
+        touch-action: manipulation;
+      }
+      #game-canvas {
+        background-color: #0c0c0c; /* Black canvas for neon effect */
+        border-radius: 0.75rem;
+        cursor: none;
+      }
+      .modal-overlay {
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(5px);
+      }
+    </style>
+  </head>
+  <body
+    class="flex flex-col items-center justify-center min-h-screen p-4 overflow-hidden"
+  >
+    <div class="w-full max-w-lg mx-auto">
+      <!-- Header: Skor, Nyawa, dan Tombol Tema -->
+      <header class="flex justify-between items-center mb-4 px-2">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">Breakout</h1>
+          <p class="text-sm" style="color: var(--text-secondary-color)">
+            Skor: <span id="score" class="font-bold">0</span>
+          </p>
+        </div>
+        <div class="flex items-center gap-4">
+          <p class="font-bold text-lg">Nyawa: <span id="lives">❤️❤️❤️</span></p>
+          <button
+            id="theme-toggle"
+            class="p-2 rounded-full"
+            style="
+              background-color: var(--card-bg-color);
+              box-shadow: var(--shadow);
+            "
+          ></button>
+        </div>
+      </header>
+
+      <!-- Papan Permainan -->
+      <div
+        class="relative w-full aspect-[4/3] rounded-xl"
+        style="box-shadow: var(--shadow)"
+      >
+        <canvas id="game-canvas"></canvas>
+
+        <!-- Modal -->
+        <div
+          id="modal"
+          class="absolute inset-0 z-10 flex items-center justify-center modal-overlay rounded-xl"
+        >
+          <div class="text-center text-white">
+            <h2 id="modal-title" class="text-4xl font-bold mb-4">
+              Mulai Permainan
+            </h2>
+            <p id="modal-text" class="mb-6">
+              Gerakkan mouse untuk mengontrol papan.
+            </p>
+            <button
+              id="modal-button"
+              class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105"
+            >
+              Mulai
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const canvas = document.getElementById("game-canvas");
+        const ctx = canvas.getContext("2d");
+        const scoreEl = document.getElementById("score");
+        const livesEl = document.getElementById("lives");
+        const modal = document.getElementById("modal");
+        const modalTitle = document.getElementById("modal-title");
+        const modalText = document.getElementById("modal-text");
+        const modalButton = document.getElementById("modal-button");
+        const themeToggle = document.getElementById("theme-toggle");
+
+        // --- Ikon ---
+        const sunIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+        const moonIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+
+        // --- Efek Suara ---
+        const synth = new Tone.Synth().toDestination();
+        const metalSynth = new Tone.MetalSynth({
+          frequency: 150,
+          envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
+          harmonicity: 3.1,
+          modulationIndex: 32,
+          resonance: 4000,
+          octaves: 1.5,
+        }).toDestination();
+
+        // --- Pengaturan Game ---
+        let ball,
+          paddle,
+          bricks,
+          score,
+          lives,
+          brickRowCount,
+          brickColumnCount,
+          brickWidth,
+          brickHeight,
+          brickPadding,
+          brickOffsetTop,
+          brickOffsetLeft;
+        let animationFrameId;
+        let gameStarted = false;
+
+        function resizeCanvas() {
+          const container = canvas.parentElement;
+          canvas.width = container.clientWidth;
+          canvas.height = container.clientHeight;
+        }
+
+        function initGameVariables() {
+          score = 0;
+          lives = 3;
+
+          paddle = {
+            w: canvas.width / 6,
+            h: 15,
+            x: canvas.width / 2 - canvas.width / 6 / 2,
+            y: canvas.height - 30,
+            speed: 8,
+            dx: 0,
+          };
+
+          ball = {
+            x: canvas.width / 2,
+            y: paddle.y - 15,
+            dx: 4,
+            dy: -4,
+            radius: 8,
+            speed: 4,
+          };
+
+          // Pengaturan Bata
+          brickRowCount = 5;
+          brickColumnCount = 8;
+          brickPadding = 10;
+          brickOffsetTop = 30;
+          brickOffsetLeft = 30;
+          brickWidth =
+            (canvas.width -
+              brickOffsetLeft * 2 -
+              brickPadding * (brickColumnCount - 1)) /
+            brickColumnCount;
+          brickHeight = 20;
+
+          bricks = [];
+          const brickColors = [
+            "#e11d48",
+            "#f97316",
+            "#eab308",
+            "#22c55e",
+            "#3b82f6",
+          ];
+          for (let c = 0; c < brickColumnCount; c++) {
+            bricks[c] = [];
+            for (let r = 0; r < brickRowCount; r++) {
+              const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+              const brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+              bricks[c][r] = {
+                x: brickX,
+                y: brickY,
+                status: 1,
+                color: brickColors[r],
+              };
+            }
+          }
+          updateUI();
+        }
+
+        function updateUI() {
+          scoreEl.innerText = score.toString();
+          livesEl.innerText = "❤️".repeat(lives);
+        }
+
+        function drawBall() {
+          ctx.beginPath();
+          ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+          ctx.fillStyle = getComputedStyle(
+            document.documentElement
+          ).getPropertyValue("--ball-color");
+          ctx.shadowColor = getComputedStyle(
+            document.documentElement
+          ).getPropertyValue("--ball-color");
+          ctx.shadowBlur = 15;
+          ctx.fill();
+          ctx.closePath();
+          ctx.shadowBlur = 0;
+        }
+
+        function drawPaddle() {
+          ctx.beginPath();
+          ctx.rect(paddle.x, paddle.y, paddle.w, paddle.h);
+          ctx.fillStyle = getComputedStyle(
+            document.documentElement
+          ).getPropertyValue("--paddle-color");
+          ctx.shadowColor = getComputedStyle(
+            document.documentElement
+          ).getPropertyValue("--paddle-color");
+          ctx.shadowBlur = 15;
+          ctx.fill();
+          ctx.closePath();
+          ctx.shadowBlur = 0;
+        }
+
+        function drawBricks() {
+          bricks.forEach((column) => {
+            column.forEach((brick) => {
+              if (brick.status === 1) {
+                ctx.beginPath();
+                ctx.rect(brick.x, brick.y, brickWidth, brickHeight);
+                ctx.fillStyle = brick.color;
+                ctx.shadowColor = brick.color;
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.closePath();
+              }
+            });
+          });
+          ctx.shadowBlur = 0;
+        }
+
+        function movePaddle() {
+          paddle.x += paddle.dx;
+          if (paddle.x < 0) paddle.x = 0;
+          if (paddle.x + paddle.w > canvas.width)
+            paddle.x = canvas.width - paddle.w;
+        }
+
+        function moveBall() {
+          ball.x += ball.dx;
+          ball.y += ball.dy;
+
+          // Dinding (kiri/kanan)
+          if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
+            ball.dx *= -1;
+            synth.triggerAttackRelease("C4", "8n");
+          }
+
+          // Dinding (atas)
+          if (ball.y - ball.radius < 0) {
+            ball.dy *= -1;
+            synth.triggerAttackRelease("C4", "8n");
+          }
+
+          // Papan
+          if (
+            ball.y + ball.radius > paddle.y &&
+            ball.x > paddle.x &&
+            ball.x < paddle.x + paddle.w
+          ) {
+            ball.dy = -ball.speed;
+            synth.triggerAttackRelease("G4", "8n");
+          }
+
+          // Lantai (kehilangan nyawa)
+          if (ball.y + ball.radius > canvas.height) {
+            lives--;
+            if (lives === 0) {
+              gameOver(false); // Kalah
+            } else {
+              resetBallAndPaddle();
+              updateUI();
+            }
+          }
+
+          // Bata
+          bricks.forEach((column) => {
+            column.forEach((brick) => {
+              if (brick.status === 1) {
+                if (
+                  ball.x > brick.x &&
+                  ball.x < brick.x + brickWidth &&
+                  ball.y > brick.y &&
+                  ball.y < brick.y + brickHeight
+                ) {
+                  ball.dy *= -1;
+                  brick.status = 0;
+                  score++;
+                  metalSynth.triggerAttackRelease("C3", "16n");
+                  if (score === brickRowCount * brickColumnCount) {
+                    gameOver(true); // Menang
+                  }
+                  updateUI();
+                }
+              }
+            });
+          });
+        }
+
+        function resetBallAndPaddle() {
+          paddle.x = canvas.width / 2 - paddle.w / 2;
+          ball.x = canvas.width / 2;
+          ball.y = paddle.y - 15;
+          ball.dx = ball.speed * (Math.random() < 0.5 ? 1 : -1);
+          ball.dy = -ball.speed;
+        }
+
+        function draw() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          drawBall();
+          drawPaddle();
+          drawBricks();
+        }
+
+        function update() {
+          movePaddle();
+          moveBall();
+        }
+
+        function gameLoop() {
+          update();
+          draw();
+          animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+          modal.style.display = "none";
+          gameStarted = true;
+          Tone.start();
+          gameLoop();
+        }
+
+        function gameOver(isWin) {
+          cancelAnimationFrame(animationFrameId);
+          gameStarted = false;
+          modal.style.display = "flex";
+          if (isWin) {
+            modalTitle.innerText = "Kamu Menang!";
+            modalText.innerText = `Skor Akhir: ${score}`;
+          } else {
+            modalTitle.innerText = "Game Over";
+            modalText.innerText = `Skor Akhir: ${score}`;
+          }
+          modalButton.innerText = "Main Lagi";
+        }
+
+        function handleMouseMove(e) {
+          const relativeX = e.clientX - canvas.offsetLeft;
+          if (relativeX > 0 && relativeX < canvas.width) {
+            paddle.x = relativeX - paddle.w / 2;
+          }
+        }
+
+        // --- Event Listeners ---
+        modalButton.addEventListener("click", () => {
+          initGameVariables();
+          startGame();
+        });
+
+        document.addEventListener("mousemove", handleMouseMove);
+
+        // Theme Logic
+        const toggleTheme = () => {
+          const html = document.documentElement;
+          const isDark = html.classList.toggle("dark");
+          html.classList.toggle("light", !isDark);
+          themeToggle.innerHTML = isDark ? sunIcon : moonIcon;
+          localStorage.setItem("breakoutTheme", isDark ? "dark" : "light");
+        };
+        themeToggle.addEventListener("click", toggleTheme);
+
+        // --- Inisialisasi ---
+        function init() {
+          const savedTheme = localStorage.getItem("breakoutTheme") || "dark";
+          document.documentElement.className = savedTheme;
+          themeToggle.innerHTML = savedTheme === "dark" ? sunIcon : moonIcon;
+          resizeCanvas();
+          initGameVariables();
+          draw(); // Draw initial state
+          window.addEventListener("resize", () => {
+            resizeCanvas();
+            initGameVariables();
+            draw();
+          });
+        }
+        init();
+      });
+    </script>
+  </body>
+</html>
